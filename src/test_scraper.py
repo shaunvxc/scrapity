@@ -16,35 +16,18 @@ header = {'User-Agent': 'Mozilla/5.0'}
 # for tuning the number of processes to run-- 
 # in general '1 process per core' yields optimal performance
 num_processes = 2
-# process table, for managing
+
 procs = []
 
-def scrape():
-
-    wiki = "http://en.wikipedia.org/wiki/Academy_Award_for_Best_Picture#1920s"
-    soup = get_soup(wiki)
-    tables = soup.find_all("table", { "class" : "wikitable"})
-    winner_links = []
-
-    for table in tables:
-        # get the year
-        for row in table.find_all("tr", style="background:#FAEB86") :
-            cells = row.find_all("td")
-            if(len(cells) == 3):
-                if(cells[0].find('a', href=True) is not None):
-                    winner_links.append(cells[0].find('a', href=True)['href'])
-                    break
-
-    for link in winner_links:
-        process_link(link)
-
 def scrape_multithread():
+    
     wiki = "http://en.wikipedia.org/wiki/Academy_Award_for_Best_Picture#1920s"
     soup = get_soup(wiki)
     tables = soup.find_all("table", { "class" : "wikitable"})
 
-    queue = Queue()
-    spawn_processes(queue)
+    work_queue = Queue()
+   
+    spawn_processes(work_queue)
 
     for table in tables:
         for row in table.find_all("tr", style="background:#FAEB86") :
@@ -54,11 +37,11 @@ def scrape_multithread():
                 if(cells[0].find('a', href=True) is not None):
                     info = cells[0].find('a', href=True)
                     t = info['href'], info.getText(), year;
-                    queue.put(t, True)
+                    work_queue.put(t, True)
                     break
     
     for x in range (0, num_processes):
-        queue.put("DONE")
+        work_queue.put("DONE")
     
     join_processes()
 
@@ -121,7 +104,8 @@ def process_link(link):
         budgetEntry = budgetRow.parent.find("td")
         if budgetEntry is not None:
             dirty_budget = budgetEntry.getText()
-            print link[2] + ": " + link[1] + ", raw_budget= " + dirty_budget + " normalized_budget= " + str(normalize(dirty_budget))     
+            norm_info = normalize(dirty_budget)
+            print link[2] + ": " + link[1] + ", raw_budget= " + dirty_budget + " normalized_budget= " + str(norm_info[0]) + " ccy= " + norm_info[1]     
         else:
             print link[2] + ": BUDGET ENTRY NOT FOUND: " + link[1]
     else:
@@ -133,49 +117,68 @@ def process_link(link):
 def normalize(budget):
     
     hasMillions = False
-    # isUSD = False
+    ccy = ""
+    
+    # remove any bad characters from the string before normalization
     budget = clean_str(budget)
+    
+    # check for millions suffix
     if re.search("million", budget, 0) is not None:
         hasMillions = True    
-
-    # if re.search("\$", budget, 0) is not None:   
-    #   isUSD = True
+    
+    if multi_currencies(budget):
+        budget = get_usd_rep(budget)
+        ccy = "USD"
+    else:
+        ccy = get_currency(budget)
+    
+    # if the budget is given as a range of numbers, take the average!
     if is_ranged_budget(budget):
-        budget = str(get_ranged_budget(budget))
+        budget = str(get_ranged_budget(budget))    
     
     temp = re.sub("\[[0-9]{1,2}\]", "", budget, 3)
     clean = re.sub(r'[^0-9.]+', '', temp)
     
     if hasMillions == True: 
-        return 1000000 * float(clean)
+        return (1000000 * float(clean), ccy )
     
-    return float(clean)
+    return (float(clean), ccy)
 
 # remove invalid ASCII chars here!
 def clean_str(budget):
-    if re.search( u"\u2013", budget):               
-        budget = re.sub( u"\u2013", "-", budget)
-    
+    for pair in invalid_chars:
+        if re.search(pair[0], budget):
+            budget = re.sub(pair[0], pair[1], budget)
+        
     return budget   
     
 def is_ranged_budget(budget):
     return (re.search("([1-9.]{1,4})-([0-9.]{1,4})", budget, 0) is not None) 
-      
-
+         
 def get_ranged_budget(budget):    
     match = re.search("([1-9.]{1,4})-([0-9.]{1,4})", budget, 0)
     
     first = match.group(1)
     second = match.group(2)
     return (float(first) + float(second)) / 2
-            
-def test_normalize(budget):
-    temp = re.sub("\[[0-9]{1,2}\]", "", budget, 2)
-    temp = re.sub("\$", "", temp, 1)
-    if re.search("million", temp, 0) is not None:
-        return (1000000 * float(re.sub("million", "", temp, 1)))
+ 
+def get_currency(budget):
+    if budget.find("$") != -1:
+        return "USD"
+    elif budget.find("GBP") != -1:
+        return "GBP"
     
-    return re.sub("\[[0-9]{1,2}\]", "", budget, 2)
+    return "CCY_NOT_FOUND"
+    
+def multi_currencies(budget):
+    if str(budget).find("$") != -1 and str(budget).find("GBP") != -1:
+        return True
+    return False
+
+def get_usd_rep(budget):
+    pieces = str(budget).partition("$")
+    usd_piece = pieces[2].split(' ')
+    return usd_piece[0]
     
 def get_soup(url):
     req = urllib2.Request(url, headers=header)
@@ -183,6 +186,22 @@ def get_soup(url):
     soup = BeautifulSoup(page)
     return soup
 
+'''
+    Function to remove invalid characters from the scraped budget strings, and replace them with
+    their eligible counterparts.
+    
+    Any other invalid characters encountered during processing can be added to this list so that 
+    the invalid characters will be removed & replaced with safe chars before any further processing
+    is done.
+'''
+def init_invalid_chars():
+    ret = []
+    ret.append((u"\u2013", "-")) # weird non unicode dash
+    ret.append((u"\u00A0", " ")) # non-breaking spaces
+    ret.append((u"\u00A3", "GBP")) # out of bounds ascii GB Pound symbol
+    return ret
+
+invalid_chars = init_invalid_chars( )
+
 start_time = time.time()
 scrape_multithread()
-# print normalize("$27 million[2]")
