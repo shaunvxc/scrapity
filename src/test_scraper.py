@@ -9,11 +9,11 @@ from multiprocessing import Process, Queue
 import re
 from __builtin__ import False
 from constants import *
-
+import sys
 # Needed  to prevent 403 error on Wikipedia
 header = {'User-Agent': 'Mozilla/5.0'}  
 # the number of processes to run, in general '1 process per core' yields optimal performance
-num_processes = 4
+num_processes = 2
 # process table
 procs = []
 
@@ -367,6 +367,10 @@ def init_invalid_chars():
     ret.append((u"\u00A3", GBP)) # out of bounds ascii GB Pound symbol
     return ret
 
+
+if sys.argv[len(sys.argv)-1].isdigit():
+    num_processes =int(sys.argv[len(sys.argv) -1])
+    print "Using " + str(num_processes )+ " processes"
 # build the invalid character-allowable substitute character set
 invalid_chars = init_invalid_chars( )
 scrape_multithread("http://en.wikipedia.org/wiki/Academy_Award_for_Best_Picture#1920s")
