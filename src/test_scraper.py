@@ -75,23 +75,25 @@ def collect_results(done_queue):
             break
         elif result is not None:
             data.append(result)
+            # only increment running_average values if a budget was scraped
             if str(result[2]) != NOT_FOUND:
                 n = n + 1
-                if(n == 1):
-                    running_average = result[2]
-                else:
-                    running_average = running_average + ( (result[2] - running_average) / n)
+                running_average = running_average + ( (result[2] - running_average) / n)
                 
+                # for factoring the NON-USD values out of the average at the end. 
                 if(result[3] != USD):
                     non_usd_sum = non_usd_sum + result[2]
                     non_usd_count = non_usd_count + 1
-                    
+     
+    # after multiprocessing, data won't be perfectly ordered, 
+    # so sort the data by year (tup[0]               
     data.sort(key=lambda tup: tup[0], reverse=False)
     for entry in data:
-        print entry[0] + ", " + entry[1] + ", " + str(entry[2]) + " " + entry[3]
+        print entry[0] + ", " + entry[1] + ", " + str(entry[2]) + ", " + entry[3] 
     
-    
+    # output results
     print "Average Budget = " + str(running_average)
+    
     if non_usd_count > 0:
         usd_only_average = ((running_average * n) - non_usd_sum) / (n - non_usd_count)
         print "Average Budget USD Only = " + str(usd_only_average)
@@ -160,9 +162,9 @@ def get_year_safe(table):
     which the process will notify the DONE queue that it is finished by pushing a SENTINAL
     onto the done_queue.
 '''
-def process_links(queue, done_queue):
+def process_links(worker_queue, done_queue):
     while True:
-        link = queue.get()
+        link = worker_queue.get()
         if(link == QUEUE_SENTINEL):
             done_queue.put(QUEUE_SENTINEL)
             break
