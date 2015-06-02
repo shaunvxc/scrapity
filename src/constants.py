@@ -17,7 +17,3 @@ QUEUE_SENTINEL = "DONE"
 
 RANGED_BUDGET_REGEXP = "([1-9.]{1,4})-([0-9.]{1,4})"
 
-'''
-Average Budget = 17230591.3704
-Average Budget USD Only = 17622156.5949
-'''
