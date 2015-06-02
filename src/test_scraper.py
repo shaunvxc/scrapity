@@ -13,7 +13,7 @@ from constants import *
 # Needed  to prevent 403 error on Wikipedia
 header = {'User-Agent': 'Mozilla/5.0'}  
 # the number of processes to run, in general '1 process per core' yields optimal performance
-num_processes = 2
+num_processes = 4
 # process table
 procs = []
 
@@ -22,7 +22,7 @@ procs = []
     catered to start @ "http://en.wikipedia.org/wiki/Academy_Award_for_Best_Picture#1920s"
 '''
 def scrape_multithread(wiki):
-    
+    print "Scraping..."
     soup = get_soup(wiki)
     tables = soup.find_all("table", { "class" : "wikitable"})
 
@@ -32,6 +32,11 @@ def scrape_multithread(wiki):
     spawn_processes(work_queue, done_queue)
 
     for table in tables:
+        # The winner is always given in a separate color than the other cells,
+        # by specifying the style to be this color in our find()- we reduce the search
+        # space to be ONLY data that we want, at the expense of RELYING on this color
+        # remaining the same going forward.   
+        # -- An alternate approach would be go work around the ordering of the winners/nominees through the tables.
         for row in table.find_all("tr", style="background:" + WINNER_COLOR) :
             year = get_year_safe(table)
             cells = row.find_all("td")
@@ -68,11 +73,15 @@ def collect_results(done_queue):
     non_usd_sum = 0
     non_usd_count = 0
     n = 0 
-    
+    procs_finished = 0 
+
     while True:
         result = done_queue.get()
         if(result == QUEUE_SENTINEL):
-            break
+            procs_finished = procs_finished +1 
+            # only break out when all running processes have finished!
+            if procs_finished == num_processes:
+                break
         elif result is not None:
             data.append(result)
             # only increment running_average values if a budget was scraped
@@ -103,6 +112,7 @@ def collect_results(done_queue):
     Spawn worker processes
 '''
 def spawn_processes(queue, done_queue):
+
     for x in range(0, num_processes):
         p = Process(target=process_links, args=(queue,done_queue,))
         p.start()
