@@ -167,8 +167,7 @@ def process_links(queue, done_queue):
             done_queue.put(QUEUE_SENTINEL)
             break
         elif link is not None:
-            result = process_link(link)  
-            done_queue.put(result, True)
+            done_queue.put(process_link(link), True)
             
 '''
     This method takes the link snipped grapped from the initial pass thru the Wiki list page, 
