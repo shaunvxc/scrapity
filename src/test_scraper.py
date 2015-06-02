@@ -10,6 +10,7 @@ import re
 from __builtin__ import False
 from constants import *
 import sys
+
 # Needed  to prevent 403 error on Wikipedia
 header = {'User-Agent': 'Mozilla/5.0'}  
 # the number of processes to run, in general '1 process per core' yields optimal performance
@@ -68,8 +69,7 @@ def scrape_multithread(wiki):
     as they are now.  However, it would be rather easy to convert these values using todays exchange rates.
 '''    
 def collect_results(done_queue):
-    if verbose:
-        print "Collecting results"
+    log("Collecting results")
     
     data = []
     running_average = 0
@@ -118,8 +118,7 @@ def spawn_processes(queue, done_queue):
 
     for x in range(0, num_processes):
         p = Process(target=process_links, args=(queue,done_queue,x))
-        if verbose:
-            print "Spawning process " + str(x) 
+        log("Spawning process " + str(x) )
         
         p.start()
         procs.append(p)
@@ -182,8 +181,7 @@ def process_links(worker_queue, done_queue, id):
     while True:
         link = worker_queue.get()
         if(link == QUEUE_SENTINEL):
-            if verbose:
-                print "Process " + str(id) + " Complete"
+            log( "Process " + str(id) + " Complete")
             done_queue.put(QUEUE_SENTINEL)
             break
         elif link is not None:
@@ -375,6 +373,9 @@ def init_invalid_chars():
     ret.append((u"\u00A3", GBP)) # out of bounds ascii GB Pound symbol
     return ret
 
+def log(message):
+    if verbose:
+        print message
 
 if sys.argv[len(sys.argv)-1].isdigit():
     num_processes =int(sys.argv[len(sys.argv) -1])
