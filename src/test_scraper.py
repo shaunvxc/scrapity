@@ -16,7 +16,8 @@ header = {'User-Agent': 'Mozilla/5.0'}
 num_processes = 2
 # process table
 procs = []
-
+# switch on/off the verbose flag to disable/enable logging
+verbose = False
 '''
     Top-level method, takes a link as argument, though this script has been fairly specifically
     catered to start @ "http://en.wikipedia.org/wiki/Academy_Award_for_Best_Picture#1920s"
@@ -67,6 +68,8 @@ def scrape_multithread(wiki):
     as they are now.  However, it would be rather easy to convert these values using todays exchange rates.
 '''    
 def collect_results(done_queue):
+    if verbose:
+        print "Collecting results"
     
     data = []
     running_average = 0
@@ -114,7 +117,10 @@ def collect_results(done_queue):
 def spawn_processes(queue, done_queue):
 
     for x in range(0, num_processes):
-        p = Process(target=process_links, args=(queue,done_queue,))
+        p = Process(target=process_links, args=(queue,done_queue,x))
+        if verbose:
+            print "Spawning process " + str(x) 
+        
         p.start()
         procs.append(p)
         
@@ -172,10 +178,12 @@ def get_year_safe(table):
     which the process will notify the DONE queue that it is finished by pushing a SENTINAL
     onto the done_queue.
 '''
-def process_links(worker_queue, done_queue):
+def process_links(worker_queue, done_queue, id):
     while True:
         link = worker_queue.get()
         if(link == QUEUE_SENTINEL):
+            if verbose:
+                print "Process " + str(id) + " Complete"
             done_queue.put(QUEUE_SENTINEL)
             break
         elif link is not None:
@@ -370,7 +378,7 @@ def init_invalid_chars():
 
 if sys.argv[len(sys.argv)-1].isdigit():
     num_processes =int(sys.argv[len(sys.argv) -1])
-    print "Using " + str(num_processes )+ " processes"
+
 # build the invalid character-allowable substitute character set
 invalid_chars = init_invalid_chars( )
 scrape_multithread("http://en.wikipedia.org/wiki/Academy_Award_for_Best_Picture#1920s")
